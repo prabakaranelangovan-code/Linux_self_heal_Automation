@@ -1,0 +1,39 @@
+---
+- name: Linux Self-Healing Checks
+  hosts: linux_servers
+  become: yes
+  gather_facts: yes
+
+  tasks:
+
+    - name: Check root filesystem usage
+      ansible.builtin.shell: df -h / | awk 'NR==2 {print $5}' | sed 's/%//'
+      register: disk_usage
+      changed_when: false
+
+    - name: Display disk usage
+      ansible.builtin.debug:
+        msg: "Disk usage is {{ disk_usage.stdout }}%"
+
+    - name: Remove old files from /tmp if disk usage exceeds 85%
+      ansible.builtin.shell: find /tmp -type f -mtime +7 -delete
+      when: disk_usage.stdout | int > 85
+
+    - name: Check available memory
+      ansible.builtin.debug:
+        msg: "Available memory: {{ ansible_memfree_mb }} MB"
+
+    - name: Check Apache service status (example)
+      ansible.builtin.service_facts:
+
+    - name: Restart Apache if stopped
+      ansible.builtin.service:
+        name: httpd
+        state: restarted
+      when:
+        - "'httpd.service' in ansible_facts.services"
+        - ansible_facts.services['httpd.service'].state != 'running'
+
+    - name: Check system load
+      ansible.builtin.debug:
+        msg: "Current load average: {{ ansible_loadavg['1m'] }}"
